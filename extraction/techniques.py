@@ -178,10 +178,13 @@ class SemanticTags(Technique):
     and P tags often include text usable as descriptions.
 
     This is a true last resort technique.
+
+    Its includes a filtering pattern
     """
     # list to support ordering of semantics, e.g. h1
     # is higher quality than h2 and so on
-    # format is ("name of tag", "destination list", store_first_n)
+    # format is
+    # ("name of tag", "destination list", source attribute, filter tuples, store_first_n)
     DEFAULT_EXTRACT_FILTERS = [('h1', 'titles', None, None, 3),
                                ('h2', 'titles', None, None, 3),
                                ('h3', 'titles', None, None, 1),
@@ -199,38 +202,18 @@ class SemanticTags(Technique):
             container[dest] = []
         container[dest].append(value)
 
-    def extractByTagName(self, soup, tagFilter):
-        extracted = {}
-        for tag, dest, max_to_store in tagFilter:
-            for found in soup.find_all(tag)[:max_to_store] or []:
-                if dest not in extracted:
-                    extracted[dest] = []
-                extracted[dest].append(" ".join(found.strings))
-        return extracted
-
-    def extractByTagAttributeName(self, soup, attrFilter):
-        extracted = {}
-        for tag, dest, attribute, max_to_store in attrFilter:
-            for found in soup.find_all(tag)[:max_to_store] or []:
-                if attribute in found.attrs:
-                    if dest not in extracted:
-                        extracted[dest] = []
-                    extracted[dest].append(found[attribute])
-        return extracted
-
     def extractByTagAttributeValue(self, soup, attrValueFilter):
         extracted = {}
         for tag, dest, attribute, filters, max_to_store in attrValueFilter:
             for found in soup.find_all(tag)[:max_to_store] or []:
-                value = None
+                matches = True
 
                 if filters:
-                    matches = True
                     for attrN, attrV in filters:
                         matches &= found[attrN] == attrV
-                    if matches:
-                        value=found[attribute]
-                else:
+
+                value = None
+                if matches:
                    if attribute:
                         value = found[attribute]
                    else:
