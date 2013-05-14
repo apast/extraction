@@ -231,10 +231,3 @@ class SemanticTags(Technique):
 
         return extracted
 
-#
-#        extracted.update(self.extractByTagAttributeValue(soup,
-#                                                         [('img', 'images', 'src', [('id', 'image-main')], 10)]
-#                                                         )
-#                         )
-#
-
