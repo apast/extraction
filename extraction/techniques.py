@@ -19,6 +19,7 @@ class Technique(object):
                 'urls': [],
                 }
 
+
 class HeadTags(Technique):
     """
     Extract info from standard HTML metatags like title, for example:
@@ -35,10 +36,9 @@ class HeadTags(Technique):
 
     This is usually a last-resort, low quality, but reliable parsing mechanism.
     """
-    meta_name_map = {
-        "description": "descriptions",
-        "author": "authors",
-        }
+    meta_name_map = {"description": "descriptions",
+                     "author": "authors",
+                }
 
     def extract(self, html):
         "Extract data from meta, link and title tags within the head tag."
@@ -70,10 +70,9 @@ class HeadTags(Technique):
                     if 'urls' not in extracted:
                         extracted['urls'] = []
                     extracted['urls'].append(link_tag['href'])
-                    
+
         return extracted
 
-    
 
 class FacebookOpengraphTags(Technique):
     """
@@ -128,7 +127,7 @@ class HTML5SemanticTags(Technique):
     The HTML5 `article` tag, and also the `video` tag give us some useful
     hints for extracting page information for the sites which happen to
     utilize these tags.
-    
+
     This technique will extract information from pages formed like::
 
         <html>
@@ -169,7 +168,7 @@ class HTML5SemanticTags(Technique):
                 if 'src' in source.attrs:
                     videos.append(source['src'])
 
-        return {'titles':titles, 'descriptions':descriptions, 'videos':videos}
+        return {'titles': titles, 'descriptions': descriptions, 'videos': videos}
 
 
 class SemanticTags(Technique):
@@ -183,13 +182,22 @@ class SemanticTags(Technique):
     # list to support ordering of semantics, e.g. h1
     # is higher quality than h2 and so on
     # format is ("name of tag", "destination list", store_first_n)
-    DEFAULT_EXTRACT_TAGNAME = [('h1', 'titles', 3),
-		              ('h2', 'titles', 3),
-		              ('h3', 'titles', 1),
-		              ('p', 'descriptions', 5),
-                	      ]
-    # format is ("name of tag", "destination list", "name of attribute" store_first_n)
-    DEFAULT_EXTRACT_ATTR = [('img', 'images', 'src', 10)]
+    DEFAULT_EXTRACT_FILTERS = [('h1', 'titles', None, None, 3),
+                               ('h2', 'titles', None, None, 3),
+                               ('h3', 'titles', None, None, 1),
+                               ('p', 'descriptions', None, None, 5),
+                               ('img', 'images', 'src', None, 10),
+                              ]
+
+    def __init__(self, extractor=None, *args, **kwargs):
+        Technique.__init__(self, extractor=extractor, *args, **kwargs)
+        tagFilters = self.DEFAULT_EXTRACT_FILTERS
+        self.tagFilters = tagFilters
+
+    def appendValue(self, container, dest, value):
+        if dest not in container:
+            container[dest] = []
+        container[dest].append(value)
 
     def extractByTagName(self, soup, tagFilter):
         extracted = {}
@@ -212,54 +220,38 @@ class SemanticTags(Technique):
 
     def extractByTagAttributeValue(self, soup, attrValueFilter):
         extracted = {}
-        for tag, dest, attribute, expectedValue, max_to_store in attrValueFilter:
+        for tag, dest, attribute, filters, max_to_store in attrValueFilter:
             for found in soup.find_all(tag)[:max_to_store] or []:
-                if attribute in found.attrs:
-                    if dest not in extracted:
-                        extracted[dest] = []
-                    attrValue = found[attribute]
-                    if attrValue == expectedValue:
-                        extracted[dest].append(attrValue)
+                value = None
+
+                if filters:
+                    matches = True
+                    for attrN, attrV in filters:
+                        matches &= found[attrN] == attrV
+                    if matches:
+                        value=found[attribute]
+                else:
+                   if attribute:
+                        value = found[attribute]
+                   else:
+                        value = " ".join(found.strings)
+
+                self.appendValue(extracted, dest, value)
         return extracted
 
     def extract(self, html):
         "Extract data from Facebook Opengraph tags."
         extracted = {}
         soup = BeautifulSoup(html)
-        
-        extracted.update(self.extractByTagAttributeValue(soup,
-                                                         [
-                                                          ('img',
-                                                           'images',
-                                                           'id',
-                                                           'image-main',
-                                                           10)
-                                                          ]
-                                                         )
-                         )
 
-        extracted.update(self.extractByTagname(soup,
-                                               self.DEFAULT_EXTRACT_TAGNAME)
-                         )
-
-        extracted.update(self.extractByTagAttributeName(soup,
-                                                self.DEFAULT_EXTRACT_ATTR)
-                         )
-
-        for tag, dest, max_to_store in self.extract_string:
-            for found in soup.find_all(tag)[:max_to_store] or []:
-                if dest not in extracted:
-                    extracted[dest] = []
-                extracted[dest].append(" ".join(found.strings))
-        
-
-        for tag, dest, attribute, max_to_store in self.extract_attr:
-            for found in soup.find_all(tag)[:max_to_store] or []:
-                if attribute in found.attrs:
-                    if dest not in extracted:
-                        extracted[dest] = []
-                    extracted[dest].append(found[attribute])
+        extracted.update(self.extractByTagAttributeValue(soup, self.tagFilters))
 
         return extracted
-    
-    
+
+#
+#        extracted.update(self.extractByTagAttributeValue(soup,
+#                                                         [('img', 'images', 'src', [('id', 'image-main')], 10)]
+#                                                         )
+#                         )
+#
+
