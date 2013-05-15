@@ -210,16 +210,17 @@ class SemanticTags(Technique):
 
                 if filters:
                     for attrN, attrV in filters:
-                        matches &= found[attrN] == attrV
+                        v = found.get(attrN, None)
+                        matches = matches and (not v == None) and (attrV in v)
 
                 value = None
                 if matches:
-                   if attribute:
+                    if attribute:
                         value = found[attribute]
-                   else:
+                    else:
                         value = " ".join(found.strings)
+                    self.appendValue(extracted, dest, value)
 
-                self.appendValue(extracted, dest, value)
         return extracted
 
     def extract(self, html):
